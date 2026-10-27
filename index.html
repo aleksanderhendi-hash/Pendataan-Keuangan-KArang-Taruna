@@ -122,10 +122,80 @@ $('backupBtn').addEventListener('click',()=>download(new Blob([JSON.stringify({a
 $('restoreBtn').addEventListener('click',()=>$('restoreFile').click());$('restoreFile').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{const obj=JSON.parse(await file.text()),arr=Array.isArray(obj)?obj:obj.transactions;if(!Array.isArray(arr))throw Error('Format file tidak dikenali');if(!confirm(`Pulihkan ${arr.length} transaksi? Pada mode lokal, data yang ada akan digabung berdasarkan ID.`))return;if(cloudReady){alert('Pemulihan JSON langsung ke cloud belum diaktifkan demi mencegah data tertimpa. Logout, pulihkan pada mode lokal, lalu hubungi administrator untuk migrasi cloud.');return}const map=new Map(txs.map(t=>[t.id,t]));arr.forEach((t,i)=>map.set(t.id||`restore-${Date.now()}-${i}`,{...t,id:t.id||`restore-${Date.now()}-${i}`}));txs=[...map.values()];localSave();render();alert('Cadangan berhasil dipulihkan.')}catch(err){alert('File tidak bisa dipulihkan: '+err.message)}finally{e.target.value=''}});
 function readConfig(){return {apiKey:$('fbApiKey').value.trim(),authDomain:$('fbAuthDomain').value.trim(),projectId:$('fbProjectId').value.trim(),appId:$('fbAppId').value.trim()}}
 function loadConfig(){try{const c=JSON.parse(localStorage.getItem(CONFIG)||'{}');for(const k of ['apiKey','authDomain','projectId','appId'])if(c[k])$('fb'+k[0].toUpperCase()+k.slice(1)).value=c[k]}catch{}}
-$('saveConfigBtn').addEventListener('click',()=>{const c=readConfig();localStorage.setItem(CONFIG,JSON.stringify(c));setStatus('Konfigurasi Firebase tersimpan di perangkat ini','local');alert('Konfigurasi tersimpan hanya di browser perangkat ini. Untuk perangkat lain, masukkan konfigurasi yang sama pada masing-masing perangkat.')});
-$('connectBtn').addEventListener('click',async()=>{const c=readConfig(),email=$('fbEmail').value.trim(),password=$('fbPassword').value;if(!c.apiKey||!c.authDomain||!c.projectId||!c.appId){alert('Lengkapi API Key, Auth Domain, Project ID, dan App ID dari Firebase Console.');return}if(!email||!password){alert('Masukkan email dan password akun Firebase anggota.');return}try{localStorage.setItem(CONFIG,JSON.stringify(c));if(unsubscribe)unsubscribe();if(!app){app=initializeApp(c);auth=getAuth(app);db=getFirestore(app);onAuthStateChanged(auth,user=>{currentUser=user;if(!user){cloudReady=false;return}})}else if(app.options.projectId!==c.projectId){alert('Untuk mengganti proyek Firebase, muat ulang halaman setelah mengubah konfigurasi.');return}await signInWithEmailAndPassword(auth,email,password);const q=query(collection(db,'organizations','ulak-sabar','transactions'),orderBy('date','asc'));unsubscribe=onSnapshot(q,snap=>{txs=snap.docs.map(d=>({id:d.id,...d.data()}));cloudReady=true;localSave();render();$('cloudPill').textContent='Terhubung';$('cloudHelp').textContent='Terhubung ke Firestore. Perubahan dari anggota lain akan muncul otomatis.';setStatus('Sinkronisasi cloud aktif · data diperbarui real-time','cloud')},err=>{cloudReady=false;setStatus('Cloud gagal: '+err.message,'error');$('cloudHelp').textContent='Periksa aturan Firestore, koneksi, dan hak akses akun.'});$('cloudPill').textContent='Menghubungkan…';}catch(err){cloudReady=false;setStatus('Login cloud gagal','error');alert('Tidak dapat terhubung: '+err.message+'\nPastikan Email/Password aktif, akun benar, dan konfigurasi Firebase sesuai.')}});
-$('logoutBtn').addEventListener('click',async()=>{try{if(auth)await signOut(auth);if(unsubscribe)unsubscribe();unsubscribe=null;cloudReady=false;currentUser=null;txs=loadLocal();render();$('cloudPill').textContent='Logout';setStatus('Logout cloud · menggunakan cadangan lokal','local')}catch(e){alert(e.message)}});
+function validConfig(c){return !!(c.apiKey&&c.authDomain&&c.projectId&&c.appId)}
+function stopCloudListener(){if(unsubscribe){unsubscribe();unsubscribe=null}}
+function showCloudDisconnected(label='Belum terhubung'){cloudReady=false;$('cloudPill').textContent=label;$('cloudHelp').textContent='Belum terhubung. Mode lokal tetap bisa digunakan; data lokal tidak otomatis berpindah ke perangkat lain.'}
+function startCloudListener(){
+ if(!auth||!db||!currentUser)return;
+ stopCloudListener();
+ $('cloudPill').textContent='Menghubungkan…';
+ $('cloudHelp').textContent='Login terdeteksi. Mengambil transaksi dari Firestore…';
+ const q=query(collection(db,'organizations','ulak-sabar','transactions'),orderBy('date','asc'));
+ unsubscribe=onSnapshot(q,snap=>{
+  txs=snap.docs.map(d=>({id:d.id,...d.data()}));
+  cloudReady=true;localSave();render();
+  $('cloudPill').textContent='Terhubung';
+  $('cloudHelp').textContent='Terhubung ke Firestore. Perubahan dari anggota lain akan muncul otomatis.';
+  setStatus('Sinkronisasi cloud aktif · data diperbarui real-time','cloud');
+ },err=>{
+  cloudReady=false;$('cloudPill').textContent='Gagal terhubung';
+  $('cloudHelp').textContent='Firestore gagal dibaca: '+err.message;
+  setStatus('Cloud gagal: '+err.message,'error');
+ });
+}
+function initFirebase(c){
+ if(!validConfig(c))throw new Error('Konfigurasi Firebase belum lengkap.');
+ if(app){
+  if(app.options.projectId!==c.projectId||app.options.apiKey!==c.apiKey)throw new Error('Konfigurasi proyek berubah. Muat ulang halaman setelah menyimpan konfigurasi baru.');
+  return;
+ }
+ app=initializeApp(c);auth=getAuth(app);db=getFirestore(app);
+ onAuthStateChanged(auth,user=>{
+  currentUser=user;
+  if(user){startCloudListener()}
+  else{
+   stopCloudListener();cloudReady=false;
+   if($('cloudPill').textContent!=='Logout')showCloudDisconnected();
+   txs=loadLocal();render();
+  }
+ });
+}
+$('saveConfigBtn').addEventListener('click',()=>{const c=readConfig();if(!validConfig(c)){alert('Lengkapi API Key, Auth Domain, Project ID, dan App ID terlebih dahulu.');return}localStorage.setItem(CONFIG,JSON.stringify(c));setStatus('Konfigurasi Firebase tersimpan di perangkat ini','local');alert('Konfigurasi tersimpan hanya di browser perangkat ini. Untuk perangkat lain, masukkan konfigurasi yang sama pada masing-masing perangkat.')});
+$('connectBtn').addEventListener('click',async()=>{
+ const c=readConfig(),email=$('fbEmail').value.trim(),password=$('fbPassword').value;
+ if(!validConfig(c)){alert('Lengkapi API Key, Auth Domain, Project ID, dan App ID dari Firebase Console.');return}
+ if(!email||!password){alert('Masukkan email dan password akun Firebase anggota.');return}
+ try{
+  localStorage.setItem(CONFIG,JSON.stringify(c));initFirebase(c);
+  $('cloudPill').textContent='Menghubungkan…';$('cloudHelp').textContent='Sedang login dan menghubungkan Firestore…';
+  await signInWithEmailAndPassword(auth,email,password);
+  $('fbPassword').value='';
+ }catch(err){
+  cloudReady=false;$('cloudPill').textContent='Gagal terhubung';
+  $('cloudHelp').textContent='Login/koneksi gagal: '+err.message;
+  setStatus('Login cloud gagal','error');
+  alert('Tidak dapat terhubung: '+err.message+'\nPastikan Email/Password aktif, akun benar, dan konfigurasi Firebase sesuai.');
+ }
+});
+$('logoutBtn').addEventListener('click',async()=>{
+ try{
+  if(auth)await signOut(auth);
+  stopCloudListener();cloudReady=false;currentUser=null;txs=loadLocal();render();
+  $('cloudPill').textContent='Logout';setStatus('Logout cloud · menggunakan cadangan lokal','local');
+ }catch(e){alert(e.message)}
+});
 txs=loadLocal();loadConfig();$('date').value=today();toggleType();render();setStatus(txs.length?`Memuat ${txs.length} transaksi dari penyimpanan perangkat`:'Siap · penyimpanan lokal aktif','local');
+try{
+ const savedConfig=readConfig();
+ if(validConfig(savedConfig)){
+  initFirebase(savedConfig);
+  $('cloudPill').textContent='Memeriksa sesi…';
+  $('cloudHelp').textContent='Memeriksa apakah sesi Firebase sebelumnya masih aktif…';
+ }
+}catch(err){
+ $('cloudPill').textContent='Belum dikonfigurasi';
+ $('cloudHelp').textContent='Konfigurasi perlu diperiksa: '+err.message;
+}
 </script>
 </body>
 </html>
