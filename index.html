@@ -78,7 +78,7 @@ import {
 const $=id=>document.getElementById(id);
 const STORE='kt_ulaksabar_transactions_v2', CONFIG='kt_ulaksabar_firebase_config_v1';
 // Public Firebase web configuration: replace the API key placeholder with the project's Web API key.
-const PUBLIC_FIREBASE_CONFIG={apiKey:'PASTE_FIREBASE_WEB_API_KEY_HERE',authDomain:'karang-taruna-ulak-sabar-34c49.firebaseapp.com',projectId:'karang-taruna-ulak-sabar-34c49',appId:'1:387644124983:web:014d5e74840b4902fe74b2'};
+const PUBLIC_FIREBASE_CONFIG={apiKey:'AIzaSyB3Yzd9ToobYPLZ4c7uVh6QK0tY_l_Hsxc',authDomain:'karang-taruna-ulak-sabar-34c49.firebaseapp.com',projectId:'karang-taruna-ulak-sabar-34c49',appId:'1:387644124983:web:014d5e74840b4902fe74b2'};
 let txs=[], editingId=null, app=null, auth=null, db=null, unsubscribe=null, cloudReady=false, currentUser=null;
 const money=n=>'Rp '+(Number(n)||0).toLocaleString('id-ID');
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
