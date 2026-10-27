@@ -78,7 +78,24 @@ const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'
 function setStatus(msg,mode='local'){ $('statusText').textContent=msg; $('modePill').textContent=mode==='cloud'?'Cloud aktif':mode==='error'?'Perlu perhatian':'Mode lokal'; $('statusDot').style.background=mode==='cloud'?'#34d399':mode==='error'?'#fb7185':'#f5b942'; }
 function localSave(){try{localStorage.setItem(STORE,JSON.stringify(txs));}catch(e){setStatus('Penyimpanan browser gagal: '+e.message,'error');}}
 function loadLocal(){try{const d=JSON.parse(localStorage.getItem(STORE)||'[]');return Array.isArray(d)?d:[]}catch{return []}}
-function sorted(){return [...txs].sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.createdAt||'').localeCompare(b.createdAt||''))}
+function timestampValue(value){
+ if(value==null)return 0;
+ if(typeof value==='string'){const n=Date.parse(value);return Number.isFinite(n)?n:0}
+ if(typeof value==='number')return Number.isFinite(value)?value:0;
+ if(typeof value.toMillis==='function'){try{return value.toMillis()}catch{}}
+ if(typeof value.seconds==='number')return value.seconds*1000;
+ if(value instanceof Date)return value.getTime();
+ return 0;
+}
+function sorted(){
+ return [...txs].sort((a,b)=>{
+  const dateOrder=String(a.date??'').localeCompare(String(b.date??''));
+  if(dateOrder!==0)return dateOrder;
+  const timeOrder=timestampValue(a.createdAt)-timestampValue(b.createdAt);
+  if(timeOrder!==0)return timeOrder;
+  return String(a.id??'').localeCompare(String(b.id??''));
+ });
+}
 function visible(){const q=$('search').value.toLowerCase().trim(), typ=$('filterType').value, from=$('fromDate').value, to=$('toDate').value;return sorted().filter(t=>(typ==='all'||t.type===typ)&&(!from||t.date>=from)&&(!to||t.date<=to)&&(!q||[t.desc,t.category,t.recordedBy,t.reference,t.loanFrom].some(v=>String(v||'').toLowerCase().includes(q))))}
 function render(){
  const list=visible(); let allIn=0,allOut=0,allLoan=0,bal=0;
