@@ -23,7 +23,7 @@
  <div class="card stat"><label>Dana Talangan (catatan)</label><strong class="gold" id="totalLoan">Rp 0</strong></div>
  <div class="card stat"><label>Saldo Kas</label><strong id="balance">Rp 0</strong></div>
 </section>
-<section class="card no-print" style="margin-bottom:16px">
+<section id="editorSection" class="card no-print" style="margin-bottom:16px">
  <div class="section-title"><h2 id="formTitle">＋ Input Transaksi Kas</h2><span class="pill">Simpan otomatis setelah disimpan</span></div>
  <form id="txForm">
   <div class="form-grid">
@@ -47,20 +47,20 @@
  <div class="table-wrap"><table><thead><tr><th>No</th><th>Tanggal</th><th>Uraian / Kategori</th><th class="num">Pemasukan</th><th class="num">Pengeluaran</th><th>Sumber talangan</th><th class="num">Talangan</th><th class="num">Saldo berjalan</th><th class="no-print">Aksi</th></tr></thead><tbody id="rows"></tbody><tfoot id="foot"></tfoot></table></div>
  <p class="note">Saldo berjalan dihitung dari pemasukan dikurangi pengeluaran. Dana talangan dicatat terpisah dan tidak otomatis menambah saldo kas, agar tidak tercampur sebelum dana benar-benar masuk kas.</p>
 </section>
-<section class="card no-print">
- <div class="section-title"><h2>☁️ Sinkronisasi lintas perangkat</h2><span class="pill" id="cloudPill">Belum dikonfigurasi</span></div>
- <p class="note">Fitur cloud memerlukan proyek Firebase milik organisasi. HTML saja tidak dapat membuat database internet bersama secara otomatis. Setelah konfigurasi diisi dan aturan keamanan dipasang, anggota yang login ke proyek yang sama dapat membaca dan menulis transaksi secara real-time.</p>
+<section id="adminSection" class="card no-print">
+ <div class="section-title"><h2>☁️ Akses pengurus</h2><span class="pill" id="cloudPill">Belum dikonfigurasi</span></div>
+ <p class="note">Anggota dapat melihat laporan tanpa login. Hanya pengurus yang login dengan akun Firebase yang boleh menambah, mengedit, atau menghapus transaksi. Jangan bagikan akun pengurus kepada anggota umum.</p>
  <div class="sync-grid">
-  <div class="field"><label for="fbApiKey">Firebase API Key</label><input id="fbApiKey" placeholder="AIza…"></div>
-  <div class="field"><label for="fbAuthDomain">Auth Domain</label><input id="fbAuthDomain" placeholder="nama-proyek.firebaseapp.com"></div>
-  <div class="field"><label for="fbProjectId">Project ID</label><input id="fbProjectId" placeholder="nama-proyek"></div>
-  <div class="field"><label for="fbAppId">App ID</label><input id="fbAppId" placeholder="1:…:web:…"></div>
+  <div class="field admin-config"><label for="fbApiKey">Firebase API Key</label><input id="fbApiKey" placeholder="AIza…"></div>
+  <div class="field admin-config"><label for="fbAuthDomain">Auth Domain</label><input id="fbAuthDomain" placeholder="nama-proyek.firebaseapp.com"></div>
+  <div class="field admin-config"><label for="fbProjectId">Project ID</label><input id="fbProjectId" placeholder="nama-proyek"></div>
+  <div class="field admin-config"><label for="fbAppId">App ID</label><input id="fbAppId" placeholder="1:…:web:…"></div>
   <div class="field"><label for="fbEmail">Email akun anggota</label><input id="fbEmail" type="email" autocomplete="username" placeholder="email anggota"></div>
   <div class="field"><label for="fbPassword">Password akun</label><input id="fbPassword" type="password" autocomplete="current-password" placeholder="Password Firebase Auth"></div>
  </div>
- <div class="form-buttons"><button class="btn" id="saveConfigBtn">Simpan konfigurasi di perangkat</button><button class="blue" id="connectBtn">Hubungkan / Login Cloud</button><button class="btn" id="logoutBtn">Logout Cloud</button></div>
- <div class="notice"><b>Langkah aktivasi cloud:</b> 1) Buat proyek di Firebase Console. 2) Aktifkan Authentication → Email/Password dan buat akun untuk pengurus. 3) Buat Firestore Database. 4) Pasang aturan Firestore yang membatasi akses ke anggota terdaftar. 5) Isi konfigurasi aplikasi web di atas. 6) Hosting file ini pada layanan HTTPS (misalnya Firebase Hosting). Jangan gunakan database dengan aturan baca/tulis publik. API key Firebase bukan kata sandi, tetapi akses database tetap harus dilindungi Authentication dan Security Rules.</div>
- <p class="note" id="cloudHelp">Belum terhubung. Mode lokal tetap bisa digunakan; data lokal tidak otomatis berpindah ke perangkat lain.</p>
+ <div class="form-buttons"><button class="btn admin-config" id="saveConfigBtn">Simpan konfigurasi di perangkat</button><button class="blue" id="connectBtn">Login pengurus</button><button class="btn" id="logoutBtn">Logout pengurus</button></div>
+ <div class="notice"><b>Catatan:</b> Anggota umum hanya dapat membaca data. Pengurus perlu login menggunakan akun Firebase yang dibuat administrator. Aturan Firestore wajib membatasi penulisan ke pengguna yang login.</div>
+ <p class="note" id="cloudHelp">Menghubungkan ke laporan kas…</p>
 </section>
 <footer>Karang Taruna “Ulak Sabar” · Desa Sungai Ringin · Buku Kas Organisasi</footer>
 </div>
@@ -71,6 +71,8 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc
 
 const $=id=>document.getElementById(id);
 const STORE='kt_ulaksabar_transactions_v2', CONFIG='kt_ulaksabar_firebase_config_v1';
+// Public Firebase web configuration: replace the API key placeholder with the project's Web API key.
+const PUBLIC_FIREBASE_CONFIG={apiKey:'PASTE_FIREBASE_WEB_API_KEY_HERE',authDomain:'karang-taruna-ulak-sabar-34c49.firebaseapp.com',projectId:'karang-taruna-ulak-sabar-34c49',appId:'1:387644124983:web:014d5e74840b4902fe74b2'};
 let txs=[], editingId=null, app=null, auth=null, db=null, unsubscribe=null, cloudReady=false, currentUser=null;
 const money=n=>'Rp '+(Number(n)||0).toLocaleString('id-ID');
 const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
@@ -103,7 +105,7 @@ function render(){
  $('totalIn').textContent=money(allIn);$('totalOut').textContent=money(allOut);$('totalLoan').textContent=money(allLoan);$('balance').textContent=money(allIn-allOut);$('balance').className=(allIn-allOut<0?'expense':'');
  $('countPill').textContent=`${list.length} transaksi`;
  let run=0; const all=sorted(); const balMap={};all.forEach(t=>{run+=(t.type==='in'?+t.amount||0: t.type==='out'?-(+t.amount||0):0);balMap[t.id]=run});
- $('rows').innerHTML=list.length?list.map((t,i)=>`<tr><td>${i+1}</td><td>${safe(t.date||'-')}</td><td><b>${safe(t.desc)}</b><div class="muted">${safe(t.category||'')}${t.reference?' · Bukti: '+safe(t.reference):''}${t.recordedBy?' · Dicatat: '+safe(t.recordedBy):''}</div></td><td class="num income">${t.type==='in'?money(t.amount):'—'}</td><td class="num expense">${t.type==='out'?money(t.amount):'—'}</td><td>${t.type==='loan'?safe(t.loanFrom||'—'):'—'}</td><td class="num gold">${t.type==='loan'?money(t.loanAmount):'—'}</td><td class="num">${money(balMap[t.id])}</td><td class="no-print"><div class="small-actions"><button class="btn" data-edit="${safe(t.id)}">Edit</button><button class="danger" data-delete="${safe(t.id)}">Hapus</button></div></td></tr>`).join(''):`<tr><td colspan="9" class="empty">Belum ada transaksi yang cocok. Tambahkan transaksi melalui formulir di atas.</td></tr>`;
+ $('rows').innerHTML=list.length?list.map((t,i)=>`<tr><td>${i+1}</td><td>${safe(t.date||'-')}</td><td><b>${safe(t.desc)}</b><div class="muted">${safe(t.category||'')}${t.reference?' · Bukti: '+safe(t.reference):''}${t.recordedBy?' · Dicatat: '+safe(t.recordedBy):''}</div></td><td class="num income">${t.type==='in'?money(t.amount):'—'}</td><td class="num expense">${t.type==='out'?money(t.amount):'—'}</td><td>${t.type==='loan'?safe(t.loanFrom||'—'):'—'}</td><td class="num gold">${t.type==='loan'?money(t.loanAmount):'—'}</td><td class="num">${money(balMap[t.id])}</td><td class="no-print">${cloudReady&&currentUser?`<div class="small-actions"><button class="btn" data-edit="${safe(t.id)}">Edit</button><button class="danger" data-delete="${safe(t.id)}">Hapus</button></div>`:'—'}</td></tr>`).join(''):`<tr><td colspan="9" class="empty">Belum ada transaksi yang cocok. Tambahkan transaksi melalui formulir di atas.</td></tr>`;
  $('foot').innerHTML=`<tr><th colspan="3">TOTAL SELURUH DATA</th><th class="num">${money(allIn)}</th><th class="num">${money(allOut)}</th><th></th><th class="num">${money(allLoan)}</th><th class="num">${money(allIn-allOut)}</th><th></th></tr>`;
 }
 function toggleType(){const loan=$('type').value==='loan';$('amountWrap').classList.toggle('hidden',loan);$('loanFromWrap').classList.toggle('hidden',!loan);$('loanAmountWrap').classList.toggle('hidden',!loan);$('amount').required=!loan;$('loanFrom').required=loan;$('loanAmount').required=loan;}
@@ -120,82 +122,15 @@ $('exportCsvBtn').addEventListener('click',()=>{const list=sorted();if(!list.len
 function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
 $('backupBtn').addEventListener('click',()=>download(new Blob([JSON.stringify({app:'Kas KT Ulak Sabar',version:2,exportedAt:new Date().toISOString(),transactions:txs},null,2)],{type:'application/json'}),`Cadangan_Kas_KT_Ulak_Sabar_${today()}.json`));
 $('restoreBtn').addEventListener('click',()=>$('restoreFile').click());$('restoreFile').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{const obj=JSON.parse(await file.text()),arr=Array.isArray(obj)?obj:obj.transactions;if(!Array.isArray(arr))throw Error('Format file tidak dikenali');if(!confirm(`Pulihkan ${arr.length} transaksi? Pada mode lokal, data yang ada akan digabung berdasarkan ID.`))return;if(cloudReady){alert('Pemulihan JSON langsung ke cloud belum diaktifkan demi mencegah data tertimpa. Logout, pulihkan pada mode lokal, lalu hubungi administrator untuk migrasi cloud.');return}const map=new Map(txs.map(t=>[t.id,t]));arr.forEach((t,i)=>map.set(t.id||`restore-${Date.now()}-${i}`,{...t,id:t.id||`restore-${Date.now()}-${i}`}));txs=[...map.values()];localSave();render();alert('Cadangan berhasil dipulihkan.')}catch(err){alert('File tidak bisa dipulihkan: '+err.message)}finally{e.target.value=''}});
-function readConfig(){return {apiKey:$('fbApiKey').value.trim(),authDomain:$('fbAuthDomain').value.trim(),projectId:$('fbProjectId').value.trim(),appId:$('fbAppId').value.trim()}}
-function loadConfig(){try{const c=JSON.parse(localStorage.getItem(CONFIG)||'{}');for(const k of ['apiKey','authDomain','projectId','appId'])if(c[k])$('fb'+k[0].toUpperCase()+k.slice(1)).value=c[k]}catch{}}
-function validConfig(c){return !!(c.apiKey&&c.authDomain&&c.projectId&&c.appId)}
-function stopCloudListener(){if(unsubscribe){unsubscribe();unsubscribe=null}}
-function showCloudDisconnected(label='Belum terhubung'){cloudReady=false;$('cloudPill').textContent=label;$('cloudHelp').textContent='Belum terhubung. Mode lokal tetap bisa digunakan; data lokal tidak otomatis berpindah ke perangkat lain.'}
-function startCloudListener(){
- if(!auth||!db||!currentUser)return;
- stopCloudListener();
- $('cloudPill').textContent='Menghubungkan…';
- $('cloudHelp').textContent='Login terdeteksi. Mengambil transaksi dari Firestore…';
- const q=query(collection(db,'organizations','ulak-sabar','transactions'),orderBy('date','asc'));
- unsubscribe=onSnapshot(q,snap=>{
-  txs=snap.docs.map(d=>({id:d.id,...d.data()}));
-  cloudReady=true;localSave();render();
-  $('cloudPill').textContent='Terhubung';
-  $('cloudHelp').textContent='Terhubung ke Firestore. Perubahan dari anggota lain akan muncul otomatis.';
-  setStatus('Sinkronisasi cloud aktif · data diperbarui real-time','cloud');
- },err=>{
-  cloudReady=false;$('cloudPill').textContent='Gagal terhubung';
-  $('cloudHelp').textContent='Firestore gagal dibaca: '+err.message;
-  setStatus('Cloud gagal: '+err.message,'error');
- });
-}
-function initFirebase(c){
- if(!validConfig(c))throw new Error('Konfigurasi Firebase belum lengkap.');
- if(app){
-  if(app.options.projectId!==c.projectId||app.options.apiKey!==c.apiKey)throw new Error('Konfigurasi proyek berubah. Muat ulang halaman setelah menyimpan konfigurasi baru.');
-  return;
- }
- app=initializeApp(c);auth=getAuth(app);db=getFirestore(app);
- onAuthStateChanged(auth,user=>{
-  currentUser=user;
-  if(user){startCloudListener()}
-  else{
-   stopCloudListener();cloudReady=false;
-   if($('cloudPill').textContent!=='Logout')showCloudDisconnected();
-   txs=loadLocal();render();
-  }
- });
-}
-$('saveConfigBtn').addEventListener('click',()=>{const c=readConfig();if(!validConfig(c)){alert('Lengkapi API Key, Auth Domain, Project ID, dan App ID terlebih dahulu.');return}localStorage.setItem(CONFIG,JSON.stringify(c));setStatus('Konfigurasi Firebase tersimpan di perangkat ini','local');alert('Konfigurasi tersimpan hanya di browser perangkat ini. Untuk perangkat lain, masukkan konfigurasi yang sama pada masing-masing perangkat.')});
-$('connectBtn').addEventListener('click',async()=>{
- const c=readConfig(),email=$('fbEmail').value.trim(),password=$('fbPassword').value;
- if(!validConfig(c)){alert('Lengkapi API Key, Auth Domain, Project ID, dan App ID dari Firebase Console.');return}
- if(!email||!password){alert('Masukkan email dan password akun Firebase anggota.');return}
- try{
-  localStorage.setItem(CONFIG,JSON.stringify(c));initFirebase(c);
-  $('cloudPill').textContent='Menghubungkan…';$('cloudHelp').textContent='Sedang login dan menghubungkan Firestore…';
-  await signInWithEmailAndPassword(auth,email,password);
-  $('fbPassword').value='';
- }catch(err){
-  cloudReady=false;$('cloudPill').textContent='Gagal terhubung';
-  $('cloudHelp').textContent='Login/koneksi gagal: '+err.message;
-  setStatus('Login cloud gagal','error');
-  alert('Tidak dapat terhubung: '+err.message+'\nPastikan Email/Password aktif, akun benar, dan konfigurasi Firebase sesuai.');
- }
-});
-$('logoutBtn').addEventListener('click',async()=>{
- try{
-  if(auth)await signOut(auth);
-  stopCloudListener();cloudReady=false;currentUser=null;txs=loadLocal();render();
-  $('cloudPill').textContent='Logout';setStatus('Logout cloud · menggunakan cadangan lokal','local');
- }catch(e){alert(e.message)}
-});
-txs=loadLocal();loadConfig();$('date').value=today();toggleType();render();setStatus(txs.length?`Memuat ${txs.length} transaksi dari penyimpanan perangkat`:'Siap · penyimpanan lokal aktif','local');
-try{
- const savedConfig=readConfig();
- if(validConfig(savedConfig)){
-  initFirebase(savedConfig);
-  $('cloudPill').textContent='Memeriksa sesi…';
-  $('cloudHelp').textContent='Memeriksa apakah sesi Firebase sebelumnya masih aktif…';
- }
-}catch(err){
- $('cloudPill').textContent='Belum dikonfigurasi';
- $('cloudHelp').textContent='Konfigurasi perlu diperiksa: '+err.message;
-}
+function readConfig(){const saved={apiKey:$('fbApiKey').value.trim(),authDomain:$('fbAuthDomain').value.trim(),projectId:$('fbProjectId').value.trim(),appId:$('fbAppId').value.trim()};return {apiKey:saved.apiKey||PUBLIC_FIREBASE_CONFIG.apiKey,authDomain:saved.authDomain||PUBLIC_FIREBASE_CONFIG.authDomain,projectId:saved.projectId||PUBLIC_FIREBASE_CONFIG.projectId,appId:saved.appId||PUBLIC_FIREBASE_CONFIG.appId}}
+function loadConfig(){const c={...PUBLIC_FIREBASE_CONFIG};try{Object.assign(c,JSON.parse(localStorage.getItem(CONFIG)||'{}'))}catch{}for(const k of ['apiKey','authDomain','projectId','appId'])if(c[k]&&c[k]!=='AIzaSyB3Yzd9ToobYPLZ4c7uVh6QK0tY_l_Hsxc')$('fb'+k[0].toUpperCase()+k.slice(1)).value=c[k]}
+function updateAccessUI(){const admin=!!(currentUser&&cloudReady);$('editorSection').classList.toggle('hidden',!admin);document.querySelectorAll('.admin-config').forEach(el=>el.classList.toggle('hidden',!!currentUser));$('connectBtn').classList.toggle('hidden',!!currentUser);$('logoutBtn').classList.toggle('hidden',!currentUser);$('cloudPill').textContent=admin?'Terhubung · Pengurus':currentUser?'Memverifikasi akses':'Mode lihat · publik';if(!admin){$('cloudHelp').textContent='Mode lihat publik: anggota dapat melihat laporan, tetapi tidak dapat mengubah transaksi.'} }
+function startCloudListener(){if(unsubscribe){unsubscribe();unsubscribe=null}const q=query(collection(db,'organizations','ulak-sabar','transactions'),orderBy('date','asc'));unsubscribe=onSnapshot(q,snap=>{txs=snap.docs.map(d=>({id:d.id,...d.data()}));cloudReady=true;localSave();render();updateAccessUI();setStatus(currentUser?'Sinkronisasi cloud aktif · pengurus':'Laporan kas publik · hanya baca',currentUser?'cloud':'local');$('cloudHelp').textContent=currentUser?'Login pengurus aktif. Perubahan tersimpan ke Firestore.':'Mode lihat publik aktif. Data dibaca langsung dari Firestore.'},err=>{cloudReady=false;updateAccessUI();$('cloudPill').textContent='Gagal memuat cloud';$('cloudHelp').textContent='Gagal membaca Firestore: '+err.message;setStatus('Cloud gagal: '+err.message,'error')})}
+function initializeCloud(){const c=readConfig();if(!c.apiKey||c.apiKey==='PASTE_FIREBASE_WEB_API_KEY_HERE'){ $('cloudPill').textContent='Perlu API Key';$('cloudHelp').textContent='Administrator perlu mengisi API Key Firebase pada konfigurasi website sebelum laporan publik dapat dimuat.';return false}try{if(!app){app=initializeApp(c);auth=getAuth(app);db=getFirestore(app);onAuthStateChanged(auth,user=>{currentUser=user;startCloudListener();updateAccessUI()})}else{db=getFirestore(app)}return true}catch(err){$('cloudPill').textContent='Konfigurasi gagal';$('cloudHelp').textContent=err.message;return false}}
+$('saveConfigBtn').addEventListener('click',()=>{const c=readConfig();localStorage.setItem(CONFIG,JSON.stringify(c));alert('Konfigurasi disimpan di browser ini. Untuk publik, API Key harus diisi pada konstanta PUBLIC_FIREBASE_CONFIG di index.html lalu commit ke GitHub.');});
+$('connectBtn').addEventListener('click',async()=>{const c=readConfig(),email=$('fbEmail').value.trim(),password=$('fbPassword').value;if(!email||!password){alert('Masukkan email dan password akun pengurus.');return}if(!initializeCloud())return;try{localStorage.setItem(CONFIG,JSON.stringify(c));await signInWithEmailAndPassword(auth,email,password);$('fbPassword').value='';}catch(err){alert('Login pengurus gagal: '+err.message)}});
+$('logoutBtn').addEventListener('click',async()=>{try{if(auth)await signOut(auth);$('fbPassword').value='';}catch(e){alert(e.message)}});
+txs=loadLocal();loadConfig();$('date').value=today();toggleType();render();setStatus('Memuat laporan kas…','local');initializeCloud();
 </script>
 </body>
 </html>
