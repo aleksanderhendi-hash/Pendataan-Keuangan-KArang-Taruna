@@ -66,8 +66,15 @@
 </div>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import {
+  getAuth,
+  setPersistence,
+  browserLocalPersistence,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getAuth, setPersistence, browserLocalPersistence, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 
 const $=id=>document.getElementById(id);
 const STORE='kt_ulaksabar_transactions_v2', CONFIG='kt_ulaksabar_firebase_config_v1';
@@ -126,7 +133,7 @@ function readConfig(){const saved={apiKey:$('fbApiKey').value.trim(),authDomain:
 function loadConfig(){const c={...PUBLIC_FIREBASE_CONFIG};try{Object.assign(c,JSON.parse(localStorage.getItem(CONFIG)||'{}'))}catch{}for(const k of ['apiKey','authDomain','projectId','appId'])if(c[k]&&c[k]!=='AIzaSyB3Yzd9ToobYPLZ4c7uVh6QK0tY_l_Hsxc')$('fb'+k[0].toUpperCase()+k.slice(1)).value=c[k]}
 function updateAccessUI(){const admin=!!(currentUser&&cloudReady);$('editorSection').classList.toggle('hidden',!admin);document.querySelectorAll('.admin-config').forEach(el=>el.classList.toggle('hidden',!!currentUser));$('connectBtn').classList.toggle('hidden',!!currentUser);$('logoutBtn').classList.toggle('hidden',!currentUser);$('cloudPill').textContent=admin?'Terhubung · Pengurus':currentUser?'Memverifikasi akses':'Mode lihat · publik';if(!admin){$('cloudHelp').textContent='Mode lihat publik: anggota dapat melihat laporan, tetapi tidak dapat mengubah transaksi.'} }
 function startCloudListener(){if(unsubscribe){unsubscribe();unsubscribe=null}const q=query(collection(db,'organizations','ulak-sabar','transactions'),orderBy('date','asc'));unsubscribe=onSnapshot(q,snap=>{txs=snap.docs.map(d=>({id:d.id,...d.data()}));cloudReady=true;localSave();render();updateAccessUI();setStatus(currentUser?'Sinkronisasi cloud aktif · pengurus':'Laporan kas publik · hanya baca',currentUser?'cloud':'local');$('cloudHelp').textContent=currentUser?'Login pengurus aktif. Perubahan tersimpan ke Firestore.':'Mode lihat publik aktif. Data dibaca langsung dari Firestore.'},err=>{cloudReady=false;updateAccessUI();$('cloudPill').textContent='Gagal memuat cloud';$('cloudHelp').textContent='Gagal membaca Firestore: '+err.message;setStatus('Cloud gagal: '+err.message,'error')})}
-function initializeCloud(){const c=readConfig();if(!c.apiKey||c.apiKey==='PASTE_FIREBASE_WEB_API_KEY_HERE'){ $('cloudPill').textContent='Perlu API Key';$('cloudHelp').textContent='Administrator perlu mengisi API Key Firebase pada konfigurasi website sebelum laporan publik dapat dimuat.';return false}try{if(!app){app=initializeApp(c);auth=getAuth(app);db=getFirestore(app);onAuthStateChanged(auth,user=>{currentUser=user;startCloudListener();updateAccessUI()})}else{db=getFirestore(app)}return true}catch(err){$('cloudPill').textContent='Konfigurasi gagal';$('cloudHelp').textContent=err.message;return false}}
+function initializeCloud(){const c=readConfig();if(!c.apiKey||c.apiKey==='PASTE_FIREBASE_WEB_API_KEY_HERE'){ $('cloudPill').textContent='Perlu API Key';$('cloudHelp').textContent='Administrator perlu mengisi API Key Firebase pada konfigurasi website sebelum laporan publik dapat dimuat.';return false}try{if(!app){app=initializeApp(c);auth=getAuth(app);await setPersistence(auth, browserLocalPersistence);db=getFirestore(app);onAuthStateChanged(auth,user=>{currentUser=user;startCloudListener();updateAccessUI()})}else{db=getFirestore(app)}return true}catch(err){$('cloudPill').textContent='Konfigurasi gagal';$('cloudHelp').textContent=err.message;return false}}
 $('saveConfigBtn').addEventListener('click',()=>{const c=readConfig();localStorage.setItem(CONFIG,JSON.stringify(c));alert('Konfigurasi disimpan di browser ini. Untuk publik, API Key harus diisi pada konstanta PUBLIC_FIREBASE_CONFIG di index.html lalu commit ke GitHub.');});
 $('connectBtn').addEventListener('click',async()=>{const c=readConfig(),email=$('fbEmail').value.trim(),password=$('fbPassword').value;if(!email||!password){alert('Masukkan email dan password akun pengurus.');return}if(!initializeCloud())return;try{localStorage.setItem(CONFIG,JSON.stringify(c));await signInWithEmailAndPassword(auth,email,password);$('fbPassword').value='';}catch(err){alert('Login pengurus gagal: '+err.message)}});
 $('logoutBtn').addEventListener('click',async()=>{try{if(auth)await signOut(auth);$('fbPassword').value='';}catch(e){alert(e.message)}});
